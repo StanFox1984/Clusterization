@@ -48,11 +48,11 @@ class MeteredObjectSet(NamedObject):
 				if not m in self.metric_names:
 					self.metric_names[m] = True
 
-	def getAverageDeltaForMetric(self, metric_name):
+	def getAverageDeltaForMetric(self, metric_name, objs):
 		total_delta = 0
 		prev_value = None
 		total_objects_with_metric = 0
-		for o in self.objects:
+		for o in objs:
 			metrics = o.getMetrics()
 			if metric_name in metrics:
 				total_objects_with_metric += 1
@@ -64,13 +64,17 @@ class MeteredObjectSet(NamedObject):
 		return total_delta / total_objects_with_metric
 
 	def createMetricClusters(self, metric_name):
-		average_delta = self.getAverageDeltaForMetric(metric_name)
+		if metric_name in self.clusters:
+			clusters = self.clusters[metric_name][0]
+		else:
+			clusters = [ ]
 
-		clusters = [ ]
 		objects_clustered = 0
 
 		objs = [ o for o in self.objects if metric_name in o.getMetrics() ]
 		objs.sort(key = lambda o: o.getMetrics()[metric_name].getValue())
+
+		average_delta = self.getAverageDeltaForMetric(metric_name, objs)
 
 		for o in objs:
 			metrics = o.getMetrics()
@@ -84,7 +88,8 @@ class MeteredObjectSet(NamedObject):
 							found = True
 							break
 					if found == True:
-						cluster.append(o)
+						if not o in cluster:
+							cluster.append(o)
 						break
 
 				if found == False:
@@ -101,7 +106,24 @@ class MeteredObjectSet(NamedObject):
 		self.getMetricNames()
 		for metric_name in self.metric_names:
 			clusters = self.createMetricClusters(metric_name)
+			# use average amount of objects per cluster as a criteria of how valuable that metric is
+			# less objects per cluster, means data are not very dense according to this metric
+			# meaning values are lying pretty far from each other and information value of being
+			# in particular cluster isn't very high.
 			self.clusters[metric_name] = ( clusters[0], clusters[1]/len(clusters[0]))
+
+	def add_object(self, o):
+		for metric_name in self.metric_names:
+			
+			average_delta = self.getAverageDeltaForMetric(metric_name)
+			for cluster in self.clusters[metric_name][0]:
+				for cluster_object in cluster:
+					value = o.getMetrics()[metric_name].getValue()
+					cluster_object_value = cluster_object.getMetrics()[metric_name].getValue()
+					if abs(value - cluster_object_value) <= average_delta:
+						if not o in cluster:
+							cluster.append(o)
+
 
 	def get_clusters_sorted(self):
 		return sorted([ self.clusters[metric_name] for metric_name in self.clusters ],
@@ -125,6 +147,12 @@ human4.addMetric(Metric("age", 700))
 
 
 s = MeteredObjectSet("set", [ human1, human2, human3, human4 ])
+
+s.clusterize()
+
+human5 = MeteredObject("human5")
+human5.addMetric(Metric("age", 70000))
+s.addObject(human5)
 
 s.clusterize()
 
