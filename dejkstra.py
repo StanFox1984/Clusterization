@@ -28,7 +28,12 @@ class Node:
 		prev_node = None
 		for node in path:
 			if prev_node != None:
-				value += prev_node.get_connection_value(node)
+				v =  prev_node.get_connection_value(node)
+				if v == None:
+					if Node.PrintDebugs:
+						print ("None value between ", prev_node, node, "path ", path)
+				else:
+				   value += v
 			prev_node = node
 
 		if Node.PrintDebugs:
@@ -43,13 +48,47 @@ class Node:
 				continue
 			new_path = list(path)
 			new_path.append(node)
+			if Node.PrintDebugs:
+				print ("Added ", node, "to path", new_path)
 			value = len(new_path) * Node.get_path_heuristic_value(new_path)
 			if not node.name in paths:
-				paths[node.name] = (new_path, value)
+				paths[node.name] = ([new_path], value)
 			else:
 				if value < paths[node.name][1]:
-					paths[node.name] = (new_path, value)
+					paths[node.name] = ([new_path], value)
+				if value == paths[node.name][1]:
+					equal_paths = paths[node.name][0]
+					if not new_path in equal_paths:
+						equal_paths.append(new_path)
+					paths[node.name] = (equal_paths, value)
 			node.get_shortest_paths(paths, new_path)
+
+	def get_spanning_tree(nodes, rev = False):
+		path_maps = { }
+		node_pairs = { }
+
+		for node in nodes:
+			if Node.PrintDebugs:
+				print ("Getting shortest paths for node", node)
+			paths = { }
+			node.get_shortest_paths(paths, [ ])
+			path_maps[node.name] = paths
+
+		for node1 in nodes:
+			for node2 in nodes:
+				if not node2.name in path_maps[node1.name]:
+					continue
+
+				edge_name = "[ " + node1.name + " , " + node2.name + " ]"
+				edge_name_rev = "[ " + node2.name + " , " + node1.name + " ]"
+				if not edge_name in node_pairs and not edge_name_rev in node_pairs:
+					if not rev:
+						node_pairs[edge_name] = path_maps[node1.name][node2.name]
+					else:
+						node_pairs[edge_name_rev] = path_maps[node2.name][node1.name]
+
+
+		return node_pairs
 
 
 
@@ -75,9 +114,13 @@ paths = {}
 
 #Node.PrintDebugs = True
 
-a.get_shortest_paths(paths)
+#a.get_shortest_paths(paths)
 
-print (paths)
+#print (paths)
+
+print (Node.get_spanning_tree([a,b,c,d,e]))
+
+print (Node.get_spanning_tree([a,b,c,d,e], True))
 
 
 
